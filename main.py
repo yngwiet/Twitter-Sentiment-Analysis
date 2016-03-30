@@ -118,7 +118,7 @@ def main():
         MaxEntClassifier_f.close()
 
     else:
-        MaxEntClassifier = MaxentClassifier.train(trainingfeaset)
+        MaxEntClassifier = MaxentClassifier.train(trainingfeaset, algorithm='GIS', max_iter=10)
         save_classifier = open("./data/processed/MaxEntClassifier2.pickle", "w")
         pickle.dump(MaxEntClassifier, save_classifier)
         save_classifier.close()
