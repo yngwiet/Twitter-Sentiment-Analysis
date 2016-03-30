@@ -8,12 +8,16 @@ import nltk
 from nltk import MaxentClassifier
 import svm
 from svmutil import *
+import time
 
 
 def main():
     # if preprocessed data was stored previously, just load it
     if os.path.isfile('./data/processed/preptrainingdata.pickle') \
             and os.path.isfile('./data/processed/preptestdata.pickle'):
+
+        print "preptrainingdata and preptestdata detected, load files..."
+
         preptrainingdata_f = open('./data/processed/preptrainingdata.pickle', 'r')
         preptrainingdata = pickle.load(preptrainingdata_f)
 
@@ -24,13 +28,20 @@ def main():
         preptestdata_f.close()
 
     else:
+
+        print "no preptrainingdata and preptestdata detected, create from scratch..."
+
         # preprocess training and test data and store them
         trainingdatapath = './data/original/origintrainingdata.csv'
         testdatapath = './data/original/origintestdata.csv'
 
         preprocessor = Preprocessor(trainingdatapath, testdatapath)
 
-        [training, test] = preprocessor.read_data(2000, 2000)
+        [training, test] = preprocessor.read_data(10000, 10000)
+
+        print "reading training data and all test data done..."
+
+        print "length of training", len(training)
 
         # preprocessing step
         for row in training+test:
@@ -38,6 +49,8 @@ def main():
 
         preptrainingdata = training
         preptestdata = test
+
+        print "preprocessing done..."
 
         # store preprocessed training data
         save_documents = open('./data/processed/preptrainingdata.pickle', 'w')
@@ -53,6 +66,8 @@ def main():
             and os.path.isfile('./data/processed/testfeaset.pickle')\
             and os.path.isfile('./data/processed/word_features.pickle'):
 
+        print "trainingfeaset, testfeaset and word_features detected, load files..."
+
         trainingfeaset_f = open('./data/processed/trainingfeaset.pickle', 'r')
         trainingfeaset = pickle.load(trainingfeaset_f)
 
@@ -67,6 +82,9 @@ def main():
         word_features_f.close()
 
     else:
+
+        print "no trainingfeaset, testfeaset and word_features detected, create from scratch..."
+
         # feature extraction and feature set construction and store them
         fea_extractor = FeatureExtractor()
         all_words = []
@@ -74,12 +92,19 @@ def main():
         for row in preptrainingdata+preptestdata:
             all_words.extend(fea_extractor.getfeavector(row[0]))
 
-        word_features = fea_extractor.getfeatures(all_words, 4000)
+        print "generating all_words done..."
+        print "start generating word_features..."
+
+        word_features = fea_extractor.getfeatures(all_words, 5000)
+
+        print "generating word_features done..."
 
         del all_words  # release some memory
 
         trainingfeaset = [(fea_extractor.construct_feaset(row[0], word_features), row[1]) for row in preptrainingdata]
         testfeaset = [(fea_extractor.construct_feaset(row[0], word_features), row[1]) for row in preptestdata]
+
+        print "generating trainingfeaset and testfeaset done... great progress!"
 
         # random.shuffle(trainingfeaset)
         # random.shuffle(testfeaset)
@@ -96,29 +121,45 @@ def main():
         pickle.dump(testfeaset, save_documents)
         save_documents.close()
 
+        print "storing training and test featureset files done..."
+
     # Naive Bayes
+    print "Naive Bayes start..."
+
     if os.path.isfile('./data/processed/NB_classifier.pickle'):
         NB_classifier_f = open("./data/processed/NB_classifier.pickle", "r")
         NB_classifier = pickle.load(NB_classifier_f)
         NB_classifier_f.close()
 
     else:
+        start = time.time()
         NB_classifier = nltk.NaiveBayesClassifier.train(trainingfeaset)
+        NB_trainingtime = time.time() - start
+
+        print "Naive Bayes training time:", NB_trainingtime
+
         save_classifier = open("./data/processed/NB_classifier.pickle", "w")
         pickle.dump(NB_classifier, save_classifier)
         save_classifier.close()
 
-    print("Naive Bayes Classifier accuracy percent:", (nltk.classify.accuracy(NB_classifier, testfeaset)) * 100)
+    print "Naive Bayes Classifier accuracy percent:", (nltk.classify.accuracy(NB_classifier, testfeaset)) * 100
     print NB_classifier.show_most_informative_features(10)
 
     # Maximum Entropy
+    print "Maximum Entropy start..."
+
     if os.path.isfile('./data/processed/MaxEntClassifier.pickle'):
         MaxEntClassifier_f = open('./data/processed/MaxEntClassifier.pickle','r')
         MaxEntClassifier = pickle.load(MaxEntClassifier_f)
         MaxEntClassifier_f.close()
 
     else:
+        start = time.time()
         MaxEntClassifier = MaxentClassifier.train(trainingfeaset, algorithm='GIS', max_iter=10)
+        MaxEnt_trainingtime = time.time() - start
+
+        print "Maximum Entropy training time:", MaxEnt_trainingtime
+
         save_classifier = open("./data/processed/MaxEntClassifier2.pickle", "w")
         pickle.dump(MaxEntClassifier, save_classifier)
         save_classifier.close()
@@ -126,12 +167,20 @@ def main():
     print "MaxEnt Classifier accuracy percent:", nltk.classify.accuracy(MaxEntClassifier, testfeaset)
     print MaxEntClassifier.show_most_informative_features(10)
 
+    print "SVM start..."
+
     fea_extractor = FeatureExtractor()
     trainingset = fea_extractor.construct_svm_feaset(preptrainingdata, word_features)
     problem = svm_problem(trainingset['labels'], trainingset['feature_vectors'])
     param = svm_parameter('-q')
     param.kernel_type = LINEAR
+
+    start = time.time()
     svm_classifier = svm_train(problem, param)
+    SVM_trainingtime = time.time() - start
+
+    print "SVM training time:", SVM_trainingtime
+
     svm_save_model('./data/svm_classifier', svm_classifier)
 
     testset = fea_extractor.construct_svm_feaset(preptestdata, word_features)

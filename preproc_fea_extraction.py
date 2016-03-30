@@ -47,7 +47,7 @@ class Preprocessor:
         f.close()
 
         # set desired nunmber of training data here !!!
-        sampletraining = trainingdata[:numofneg] + trainingdata[160000-numofpos:]
+        sampletraining = trainingdata[:numofneg] + trainingdata[1600000-numofpos:]
 
         return sampletraining, testdata
 
@@ -121,6 +121,8 @@ class FeatureExtractor:
             feanum = len(list(freqdist.keys()))
         elif feanum > len(list(freqdist.keys())):
             feanum = len(list(freqdist.keys()))
+
+        print "the number of features is", feanum
 
         featuples = freqdist.most_common(feanum)
 
