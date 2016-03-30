@@ -6,11 +6,50 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.stem import WordNetLemmatizer
+import csv
 
 
 class Preprocessor:
-    def __init__(self):
-        pass
+    def __init__(self, origintrainloc, origintestloc):
+        self.origintrainloc = origintrainloc
+        self.origintestloc = origintestloc
+
+    def read_data(self, numofpos, numofneg):
+        f = open(self.origintrainloc, 'r')
+        f_csv = csv.reader(f)
+
+        trainingdata = []
+
+        count = 0
+
+        for row in f_csv:
+            count += 1
+            if count <= 800000:
+                trainingdata.append([row[5], 'neg'])
+            else:
+                trainingdata.append([row[5], 'pos'])
+
+        f.close()
+
+        # get tweets and their sentiment labels from test dataset
+        f = open(self.origintestloc, 'r')
+        f_csv = csv.reader(f)
+
+        testdata = []
+
+        for row in f_csv:
+            if row[0] != '2':  # ignore neutral test data
+                if row[0] == '0':
+                    testdata.append([row[5], 'neg'])
+                else:
+                    testdata.append([row[5], 'pos'])
+
+        f.close()
+
+        # set desired nunmber of training data here !!!
+        sampletraining = trainingdata[:numofneg] + trainingdata[160000-numofpos:]
+
+        return sampletraining, testdata
 
     @staticmethod
     def preprocess(document):

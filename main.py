@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import csv
 import pickle
 import os
 import random
@@ -10,7 +9,6 @@ from nltk import MaxentClassifier
 
 
 def main():
-
     # if preprocessed data was stored previously, just load it
     if os.path.isfile('./data/processed/preptrainingdata.pickle') \
             and os.path.isfile('./data/processed/preptestdata.pickle'):
@@ -25,48 +23,19 @@ def main():
 
     else:
         # preprocess training and test data and store them
-        f = open('./data/original/origintrainingdata.csv', 'r')
-        f_csv = csv.reader(f)
+        trainingdatapath = './data/original/origintrainingdata.csv'
+        testdatapath = './data/original/origintestdata.csv'
 
-        trainingdata = []
+        preprocessor = Preprocessor(trainingdatapath, testdatapath)
 
-        count = 0
-
-        for row in f_csv:
-            count += 1
-            if count <= 800000:
-                trainingdata.append([row[5], 'neg'])
-            else:
-                trainingdata.append([row[5], 'pos'])
-
-        f.close()
-
-        # get tweets and their sentiment labels from test dataset
-        f = open('./data/original/origintestdata.csv', 'r')
-        f_csv = csv.reader(f)
-
-        testdata = []
-
-        for row in f_csv:
-            if row[0] != '2':  # ignore neutral test data
-                if row[0] == '0':
-                    testdata.append([row[5], 'neg'])
-                else:
-                    testdata.append([row[5], 'pos'])
-
-        f.close()
-
-        # set desired nunmber of training data here !!!
-        sampletraining = trainingdata[:2000] + trainingdata[1598000:]
+        [training, test] = preprocessor.read_data(2000, 2000)
 
         # preprocessing step
-        preprocessor = Preprocessor()
-
-        for row in sampletraining+testdata:
+        for row in training+test:
             row[0] = preprocessor.preprocess(row[0])
 
-        preptrainingdata = sampletraining
-        preptestdata = testdata
+        preptrainingdata = training
+        preptestdata = test
 
         # store preprocessed training data
         save_documents = open('./data/processed/preptrainingdata.pickle', 'w')
@@ -103,7 +72,7 @@ def main():
         for row in preptrainingdata+preptestdata:
             all_words.extend(fea_extractor.getfeavector(row[0]))
 
-        word_features = fea_extractor.getfeatures(all_words, 5000)
+        word_features = fea_extractor.getfeatures(all_words, 4000)
 
         del all_words  # release some memory
 
