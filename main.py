@@ -6,6 +6,8 @@ import random
 from preproc_fea_extraction import Preprocessor, FeatureExtractor
 import nltk
 from nltk import MaxentClassifier
+import svm
+from svmutil import *
 
 
 def main():
@@ -79,8 +81,8 @@ def main():
         trainingfeaset = [(fea_extractor.construct_feaset(row[0], word_features), row[1]) for row in preptrainingdata]
         testfeaset = [(fea_extractor.construct_feaset(row[0], word_features), row[1]) for row in preptestdata]
 
-        random.shuffle(trainingfeaset)
-        random.shuffle(testfeaset)
+        # random.shuffle(trainingfeaset)
+        # random.shuffle(testfeaset)
 
         save_documents = open('./data/processed/word_features.pickle', 'w')
         pickle.dump(word_features, save_documents)
@@ -123,6 +125,20 @@ def main():
 
     print "MaxEnt Classifier accuracy percent:", nltk.classify.accuracy(MaxEntClassifier, testfeaset)
     print MaxEntClassifier.show_most_informative_features(10)
+
+    fea_extractor = FeatureExtractor()
+    trainingset = fea_extractor.construct_svm_feaset(preptrainingdata, word_features)
+    problem = svm_problem(trainingset['labels'], trainingset['feature_vectors'])
+    param = svm_parameter('-q')
+    param.kernel_type = LINEAR
+    svm_classifier = svm_train(problem, param)
+    svm_save_model('./data/svm_classifier', svm_classifier)
+
+    testset = fea_extractor.construct_svm_feaset(preptestdata, word_features)
+    p_labels, p_accs, p_vals = svm_predict(testset['labels'], testset['feature_vectors'], svm_classifier)
+
+    print p_labels
+    print p_accs
 
 if __name__ == "__main__":
     main()

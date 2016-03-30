@@ -138,3 +138,25 @@ class FeatureExtractor:
             features[word] = (word in words)
 
         return features
+
+    def construct_svm_feaset(self, prepdata, word_features):
+        word_features = sorted(word_features)
+        feature_vectors = []
+        labels = []
+        for row in prepdata:
+            label = 0
+            map = {}
+            for word in word_features:
+                map[word] = 0
+            words = self.getfeavector(row[0])
+            for word in words:
+                if word in map:
+                    map[word] = 1
+            values = map.values()
+            feature_vectors.append(values)
+            if row[1] == 'pos':
+                label = 0
+            elif row[1] == 'neg':
+                label = 1
+            labels.append(label)
+        return {'feature_vectors': feature_vectors, 'labels':labels}
