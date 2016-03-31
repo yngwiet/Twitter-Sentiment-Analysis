@@ -1,18 +1,19 @@
 #!/usr/bin/python
 
 import pickle
-import os
-import random
 from preproc_fea_extraction import Preprocessor, FeatureExtractor
 import nltk
 from nltk import MaxentClassifier
-import svm
 from svmutil import *
 import time
 
 
 def main():
+    # for feature extraction
+    fea_extractor = FeatureExtractor()
+
     # if preprocessed data was stored previously, just load it
+    # for what is mean by "preprocessed", refer to preprocess method in preproc_fea_extraction.py
     if os.path.isfile('./data/processed/preptrainingdata.pickle') \
             and os.path.isfile('./data/processed/preptestdata.pickle'):
 
@@ -62,6 +63,10 @@ def main():
         pickle.dump(preptestdata, save_documents)
         save_documents.close()
 
+    # if training feature set and test feature set are stored previously, just load them
+    # these feature set are used by Naive Bayes and Maximum Entropy
+    # word_features contains the names of features (which are words)
+    # e.g. a word is a feature, feature name is the word, value is True or False
     if os.path.isfile('./data/processed/trainingfeaset.pickle') \
             and os.path.isfile('./data/processed/testfeaset.pickle')\
             and os.path.isfile('./data/processed/word_features.pickle'):
@@ -86,7 +91,6 @@ def main():
         print "no trainingfeaset, testfeaset and word_features detected, create from scratch..."
 
         # feature extraction and feature set construction and store them
-        fea_extractor = FeatureExtractor()
         all_words = []
 
         for row in preptrainingdata+preptestdata:
@@ -95,6 +99,7 @@ def main():
         print "generating all_words done..."
         print "start generating word_features..."
 
+        # set desired # of features in the second parameter
         word_features = fea_extractor.getfeatures(all_words, 5000)
 
         print "generating word_features done..."
@@ -160,30 +165,38 @@ def main():
 
         print "Maximum Entropy training time:", MaxEnt_trainingtime
 
-        save_classifier = open("./data/processed/MaxEntClassifier2.pickle", "w")
+        save_classifier = open("./data/processed/MaxEntClassifier.pickle", "w")
         pickle.dump(MaxEntClassifier, save_classifier)
         save_classifier.close()
 
     print "MaxEnt Classifier accuracy percent:", nltk.classify.accuracy(MaxEntClassifier, testfeaset)
     print MaxEntClassifier.show_most_informative_features(10)
 
+    # SVM
     print "SVM start..."
 
-    fea_extractor = FeatureExtractor()
-    trainingset = fea_extractor.construct_svm_feaset(preptrainingdata, word_features)
-    problem = svm_problem(trainingset['labels'], trainingset['feature_vectors'])
-    param = svm_parameter('-q')
-    param.kernel_type = LINEAR
-
-    start = time.time()
-    svm_classifier = svm_train(problem, param)
-    SVM_trainingtime = time.time() - start
-
-    print "SVM training time:", SVM_trainingtime
-
-    svm_save_model('./data/svm_classifier', svm_classifier)
-
     testset = fea_extractor.construct_svm_feaset(preptestdata, word_features)
+
+    if os.path.isfile('./data/processed/svm_classifier.model'):
+
+        svm_classifier = svm_load_model('./data/processed/svm_classifier.model')
+
+    else:
+
+        trainingset = fea_extractor.construct_svm_feaset(preptrainingdata, word_features)
+
+        problem = svm_problem(trainingset['labels'], trainingset['feature_vectors'])
+        param = svm_parameter('-q')
+        param.kernel_type = LINEAR
+
+        start = time.time()
+        svm_classifier = svm_train(problem, param)
+        svm_trainingtime = time.time() - start
+
+        print "SVM training time:", svm_trainingtime
+
+        svm_save_model('./data/processed/svm_classifier.model', svm_classifier)
+
     p_labels, p_accs, p_vals = svm_predict(testset['labels'], testset['feature_vectors'], svm_classifier)
 
     print p_labels
