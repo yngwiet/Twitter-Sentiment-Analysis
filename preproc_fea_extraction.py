@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
-import re
+import csv
+import itertools
 import nltk
-from nltk.tokenize import word_tokenize
+from nltk import bigrams
 from nltk.corpus import stopwords
+from nltk.collocations import BigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures
 from nltk.stem import PorterStemmer
 from nltk.stem import WordNetLemmatizer
-import csv
+from nltk.tokenize import word_tokenize
+import re
 
 
 class Preprocessor:
@@ -86,11 +90,9 @@ class FeatureExtractor:
         else:
             self.lemmatizer = lemmatizer
 
-    def getfeavector(self, document):
+    def get_feavector(self, document):
 
         words = word_tokenize(document)
-
-        # print words
 
         # remove special chars. e.g. punctuation
         words = [word for word in words
@@ -109,12 +111,14 @@ class FeatureExtractor:
         # apply stemming
         words = [self.stemmer.stem(word) for word in words]
 
-        # print words
-
         return words
 
+    def get_bigram_feavector(self, document):
+        words = self.get_feavector(document)
+        return list(bigrams(words))
+
     @staticmethod
-    def getfeatures(all_words, feanum):
+    def get_features(all_words, feanum):
         freqdist = nltk.FreqDist(all_words)
 
         if feanum == 'max':
@@ -133,11 +137,54 @@ class FeatureExtractor:
 
         return features
 
+    @staticmethod
+    def get_unibigram_features(all_words, uni_feanum, bi_feanum):
+        word_fd = nltk.FreqDist(all_words)
+        bigram_fd = nltk.FreqDist(nltk.bigrams(all_words))
+
+        if uni_feanum == 'max':
+            uni_feanum = len(list(word_fd.keys()))
+        elif uni_feanum > len(list(word_fd.keys())):
+            uni_feanum = len(list(word_fd.keys()))
+
+        if bi_feanum == 'max':
+            bi_feanum = len(list(bigram_fd.keys()))
+        elif bi_feanum > len(list(bigram_fd.keys())):
+            bi_feanum = len(list(bigram_fd.keys()))
+
+        finder = BigramCollocationFinder(word_fd, bigram_fd)
+        bigrams = finder.nbest(BigramAssocMeasures.chi_sq, bi_feanum)
+
+        print "the number of unigram features is", uni_feanum
+        print "the number of bigram features is", bi_feanum
+
+        featuples = word_fd.most_common(uni_feanum)
+
+        selected_words = []
+
+        for i in range(uni_feanum):
+            selected_words.append(featuples[i][0])
+
+        features = []
+        for ngram in itertools.chain(selected_words, bigrams):
+            features.append(ngram)
+
+        return features
+
     def construct_feaset(self, document, word_features):
         features = {}
-        words = self.getfeavector(document)
+        words = self.get_feavector(document)
         for word in word_features:
             features[word] = (word in words)
+
+        return features
+
+    def construct_unibigram_feaset(self, document, word_features):
+        features = {}
+        words = self.get_feavector(document)
+        bigram_words = self.get_bigram_feavector(document)
+        for word in word_features:
+            features[word] = (word in words+bigram_words)
 
         return features
 
@@ -150,7 +197,7 @@ class FeatureExtractor:
             map = {}
             for word in word_features:
                 map[word] = 0
-            words = self.getfeavector(row[0])
+            words = self.get_feavector(row[0])
             for word in words:
                 if word in map:
                     map[word] = 1
@@ -162,3 +209,26 @@ class FeatureExtractor:
                 label = 1
             labels.append(label)
         return {'feature_vectors': feature_vectors, 'labels':labels}
+
+    def construct_unibigram_svm_feaset(self, prepdata, word_features):
+        word_features = sorted(word_features)
+        feature_vectors = []
+        labels = []
+        for row in prepdata:
+            label = 0
+            map = {}
+            for word in word_features:
+                map[word] = 0
+            words = self.get_feavector(row[0])
+            bigram_words = self.get_bigram_feavector(row[0])
+            for word in words+bigram_words:
+                if word in map:
+                    map[word] = 1
+            values = map.values()
+            feature_vectors.append(values)
+            if row[1] == 'pos':
+                label = 0
+            elif row[1] == 'neg':
+                label = 1
+            labels.append(label)
+        return {'feature_vectors': feature_vectors, 'labels': labels}
